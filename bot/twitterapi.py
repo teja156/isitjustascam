@@ -355,7 +355,7 @@ def parseTweets(tweets,test=False):
 
 		tweet = {'tweet_id':tweet_id, 'tweet_author_username':tweet_author_username, 'tweet_author_id':tweet_author_id, 'url':url}
 
-		analyzeAndPostResponse(checks,sus_score,url,tweet,results=results)
+		analyzeAndPostResponse(checks,sus_score,url,tweet)
 
 def main():
 	global WAIT_TIME
