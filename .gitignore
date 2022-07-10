@@ -1,0 +1,10 @@
+tmp/
+logs/
+test-logs/
+.env
+.venv
+*.pyc
+*.pyo
+.tox/
+venv/
+env/
