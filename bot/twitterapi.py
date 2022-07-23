@@ -37,9 +37,9 @@ if not os.path.exists(logs_path):
 
 logging.basicConfig(
 	handlers=[logging.FileHandler(filename=os.path.join(logs_path,'log.txt'), encoding='utf-8', mode='a+')],
-    format='[%(asctime)s] [%(levelname)s]   %(message)s',
-    level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S',
+	format='[%(asctime)s] [%(levelname)s]   %(message)s',
+	level=logging.INFO,
+	datefmt='%Y-%m-%d %H:%M:%S',
 	force=True)
 
 logger = logging.getLogger(__name__)
@@ -63,15 +63,16 @@ ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 ACCESS_TOKEN_SECRET = os.getenv("ACCESS_TOKEN_SECRET")
 USER_ID = os.getenv("USER_ID")
 BOT_USERNAME = os.getenv("BOT_USERNAME")
+MAINTENANCE_MODE = os.getenv("MAINTENANCE_MODE")
 
 
 client = tweepy.Client(bearer_token=BEARER_TOKEN, 
-                        consumer_key=API_KEY, 
-                        consumer_secret=API_KEY_SECRET, 
-                        access_token=ACCESS_TOKEN, 
-                        access_token_secret=ACCESS_TOKEN_SECRET, 
-                        return_type = dict,
-                        wait_on_rate_limit=True)
+						consumer_key=API_KEY, 
+						consumer_secret=API_KEY_SECRET, 
+						access_token=ACCESS_TOKEN, 
+						access_token_secret=ACCESS_TOKEN_SECRET, 
+						return_type = dict,
+						wait_on_rate_limit=True)
 
 
 
@@ -117,9 +118,12 @@ def postTweet(tweet_text,reply_to=""):
 def checkInDB(url):
 	db = dbconfig()
 	cursor = db.cursor()
-	query = f"SELECT * FROM twitterbot.scans WHERE target_url='{url}'"
-	cursor.execute(query)
+	# query = f"SELECT * FROM twitterbot.scans WHERE target_url='{url}'"
+	query = "SELECT * FROM twitterbot.scans WHERE target_url = %(url)s"
+	cursor.execute(query,{'url':url})
 	results = cursor.fetchall()
+
+	# logger.info(f"checkInDB Retrieved results {str(results)}")
 
 	if len(results)!=0:
 		logger.info("Target URL already exists in scans db")
@@ -259,9 +263,7 @@ def analyzeAndPostResponse(checks,sus_score,url,tweet,test=False):
 		new_tweet_id = postTweet(tweet_text, tweet_id)
 		if new_tweet_id is not None:
 			addToDB(tweet_id=new_tweet_id, tweet_author_username=tweet_author_username, tweet_author_id=tweet_author_id, url=scanned_url, results=checks)
-			
-		
-	
+
 
 def parseTweets(tweets,test=False):
 	# print(tweets)
@@ -291,6 +293,10 @@ def parseTweets(tweets,test=False):
 			if author['id'] == tweet_author_id:
 				tweet_author_username = author['username']
 				break
+		
+		if MAINTENANCE_MODE == 'ON':
+			maintenance(reply_to=tweet_id)
+			continue
 		
 		regex = "http[s]?[z]?:\/\/(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 		url = re.findall(regex,tweet_text)
@@ -357,13 +363,45 @@ def parseTweets(tweets,test=False):
 
 		analyzeAndPostResponse(checks,sus_score,url,tweet)
 
+
+def maintenance(reply_to):
+	tweet_text = "Bot is currently in maintenance, scan will be performed once bot is back online."
+	postTweet(tweet_text=tweet_text, reply_to=reply_to)
+
+
 def main():
 	global WAIT_TIME
+	global MAINTENANCE_MODE
 	print("Monitoring tweets! - PROGRAM STARTED")
 	count = 0
 	while 1:
 		count+=1
 		logger.info(f"Round {count} - Checking for mentioned tweets")
+
+		if os.getenv("MAINTENANCE_MODE") != MAINTENANCE_MODE:
+			MAINTENANCE_MODE = os.getenv("MAINTENANCE_MODE")
+			logger.info(f"Changed MAINTENANCE_MODE to {MAINTENANCE_MODE}")
+			if MAINTENANCE_MODE=='ON':
+				if os.path.exists(os.path.join(BASE_DIR,"tmp","lastmentionedtweet")):
+					f = open(os.path.join(BASE_DIR,"tmp","lastmentionedtweet"),"r")
+					lastmentioned = f.read()
+					f.close()
+
+					if lastmentioned.strip()!="":
+						f = open(os.path.join(BASE_DIR,"tmp","maintenance_lastmentionedtweet"),"w")
+						f.write(lastmentioned)
+						f.close()
+			if MAINTENANCE_MODE=='OFF':
+				if os.path.exists(os.path.join(BASE_DIR,"tmp","maintenance_lastmentionedtweet")):
+					f = open(os.path.join(BASE_DIR,"tmp","maintenance_lastmentionedtweet"),"r")
+					maintenance_lastmentioned = f.read()
+					f.close()
+
+					if maintenance_lastmentioned.strip()!="":
+						f = open(os.path.join(BASE_DIR,"tmp","lastmentionedtweet"),"w")
+						f.write(maintenance_lastmentioned)
+						f.close()
+
 		print(f"Round {count} - Checking for mentioned tweets")
 		tweets = None
 		if not os.path.exists(os.path.join(BASE_DIR,"tmp")):
