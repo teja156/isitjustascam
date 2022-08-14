@@ -1,3 +1,4 @@
+from tkinter.tix import TCL_WINDOW_EVENTS
 import tweepy
 import requests
 import os
@@ -27,32 +28,24 @@ client = tweepy.Client( bearer_token=BEARER_TOKEN,
                         wait_on_rate_limit=True)
 
 
-def postTweet(tweet_text, reply_to=""):
-    try:
-        if reply_to == "":
-            print(client.create_tweet(text = tweet_text))
-        else:
-            client.create_tweet(text = tweet_text, in_reply_to_tweet_id= reply_to)
-        return [1]
-    except Exception as e:
-        print("EXCEPTION OCCURED: ",e)
-        return [0,e]
+
+def mentionTest(since_id):
+    tweets = client.get_users_mentions(id=USER_ID, since_id=since_id, expansions=["referenced_tweets.id","author_id"])
+    return tweets
+
+def getTweet(tweet_id):
+    tweet = client.get_tweet(id=tweet_id, expansions=["referenced_tweets.id","author_id"])
+    return tweet
+
+
+# print(mentionTest("1556919637979254784"))
+print("Original tweet: ")
+print(getTweet("1556173277835546625"))
+print()
+print("Replied Tweet: ")
+print(getTweet("1556437707034791936"))
 
 
 
-def retrieveTweet(tweet_id):
-    try:
-        status = client.get_tweet(id=tweet_id)
-        return status['data']
-    except Exception as e:
-        logging.error("Exception occured in retrieveTweet")
-        logging.error(str(e))
-        return None
+
     
-        
-
-
-# postTweet("HELLO")
-# print(retrieveTweet("1544527288049750017"))
-
-# print(retrieveTweet("1557764044534136833"))

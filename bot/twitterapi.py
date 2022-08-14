@@ -289,6 +289,11 @@ def parseTweets(tweets,test=False):
 		tweet_author_id = tweet['author_id']
 		tweet_author_username = ""
 
+		# Check if tweet is a reply or retweet
+		if 'referenced_tweets' in tweet:
+			# it is a reply or rt, don't process
+			continue
+
 		for author in tweets['includes']['users']:
 			if author['id'] == tweet_author_id:
 				tweet_author_username = author['username']
@@ -365,6 +370,7 @@ def parseTweets(tweets,test=False):
 
 
 def maintenance(reply_to):
+	logger.info("MAINTENANCE MODE ON")
 	tweet_text = "Bot is currently in maintenance, scan will be performed once bot is back online."
 	postTweet(tweet_text=tweet_text, reply_to=reply_to)
 
@@ -377,31 +383,6 @@ def main():
 	while 1:
 		count+=1
 		logger.info(f"Round {count} - Checking for mentioned tweets")
-
-		if os.getenv("MAINTENANCE_MODE") != MAINTENANCE_MODE:
-			MAINTENANCE_MODE = os.getenv("MAINTENANCE_MODE")
-			logger.info(f"Changed MAINTENANCE_MODE to {MAINTENANCE_MODE}")
-			if MAINTENANCE_MODE=='ON':
-				if os.path.exists(os.path.join(BASE_DIR,"tmp","lastmentionedtweet")):
-					f = open(os.path.join(BASE_DIR,"tmp","lastmentionedtweet"),"r")
-					lastmentioned = f.read()
-					f.close()
-
-					if lastmentioned.strip()!="":
-						f = open(os.path.join(BASE_DIR,"tmp","maintenance_lastmentionedtweet"),"w")
-						f.write(lastmentioned)
-						f.close()
-			if MAINTENANCE_MODE=='OFF':
-				if os.path.exists(os.path.join(BASE_DIR,"tmp","maintenance_lastmentionedtweet")):
-					f = open(os.path.join(BASE_DIR,"tmp","maintenance_lastmentionedtweet"),"r")
-					maintenance_lastmentioned = f.read()
-					f.close()
-
-					if maintenance_lastmentioned.strip()!="":
-						f = open(os.path.join(BASE_DIR,"tmp","lastmentionedtweet"),"w")
-						f.write(maintenance_lastmentioned)
-						f.close()
-
 		print(f"Round {count} - Checking for mentioned tweets")
 		tweets = None
 		if not os.path.exists(os.path.join(BASE_DIR,"tmp")):
@@ -425,9 +406,9 @@ def main():
 			f.close()
 			logger.info(f"Retrieved recent tweet_id {recent_tweet} from 'tmp/lastmentionedtweet'")
 			if recent_tweet!="":
-				tweets = client.get_users_mentions(id=USER_ID, since_id=recent_tweet, expansions="author_id")
+				tweets = client.get_users_mentions(id=USER_ID, since_id=recent_tweet, expansions=["referenced_tweets.id","author_id"])
 			else:
-				tweets = client.get_users_mentions(id=USER_ID, expansions="author_id")
+				tweets = client.get_users_mentions(id=USER_ID, expansions=["referenced_tweets.id","author_id"])
 
 		parseTweets(tweets=tweets)
 		time.sleep(WAIT_TIME*60)
